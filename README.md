@@ -19,7 +19,7 @@ on:
 
 jobs:
   nix-ci:
-    uses: monarchic-meta/.github/.github/workflows/nix-ci.yml@main
+    uses: monarchic-ai/.github/.github/workflows/nix-ci.yml@main
     with:
       publish_cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     secrets: inherit
@@ -40,7 +40,7 @@ workflows before publishing packages, images, deployments, or GitHub releases:
 ```yaml
 jobs:
   release-preflight:
-    uses: monarchic-meta/.github/.github/workflows/release.yml@main
+    uses: monarchic-ai/.github/.github/workflows/release.yml@main
     secrets: inherit
 ```
 
@@ -66,7 +66,7 @@ on:
 
 jobs:
   maintenance:
-    uses: monarchic-meta/.github/.github/workflows/maintenance.yml@main
+    uses: monarchic-ai/.github/.github/workflows/maintenance.yml@main
     with:
       check_flake: true
       maintenance_command: nix run .#maintenance-report
@@ -94,7 +94,7 @@ on:
 
 jobs:
   docker-ci:
-    uses: monarchic-meta/.github/.github/workflows/docker-ci.yml@main
+    uses: monarchic-ai/.github/.github/workflows/docker-ci.yml@main
     with:
       runner_labels: '["self-hosted","Linux","X64","monarchic-local","docker"]'
       context: .
