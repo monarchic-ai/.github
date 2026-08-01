@@ -145,7 +145,7 @@ jobs:
 
       - name: Configure production AWS credentials
         if: ${{ inputs.publish_cache && github.event_name != 'pull_request' }}
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           role-to-assume: ${{ env.MONARCHIC_NIX_CACHE_AWS_ROLE_ARN }}
           aws-region: ${{ env.MONARCHIC_NIX_CACHE_REGION }}
