@@ -1,0 +1,94 @@
+name: NPM Publish
+
+on:
+  workflow_call:
+    inputs:
+      default_branch:
+        description: "Branch the release tag must point at."
+        required: false
+        type: string
+        default: main
+      node_version:
+        description: "Node.js version used to build and publish."
+        required: false
+        type: string
+        default: "24"
+      pnpm_version:
+        description: "pnpm version used to install dependencies."
+        required: false
+        type: string
+        default: 11.9.0
+      install_command:
+        description: "Dependency installation command."
+        required: false
+        type: string
+        default: pnpm install --frozen-lockfile
+      build_command:
+        description: "Package build command to run before publishing."
+        required: false
+        type: string
+        default: pnpm run build
+      publish_command:
+        description: "NPM publish command."
+        required: false
+        type: string
+        default: pnpm publish --access restricted
+      registry_url:
+        description: "NPM registry URL."
+        required: false
+        type: string
+        default: https://registry.npmjs.org
+    secrets:
+      NPM_TOKEN:
+        required: true
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+
+jobs:
+  release-preflight:
+    uses: monarchic-ai/.github/.github/workflows/release.yml@main
+    with:
+      default_branch: ${{ inputs.default_branch }}
+    secrets: inherit
+
+  publish:
+    name: Publish NPM package
+    needs: release-preflight
+    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS) }}
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node_version }}
+          registry-url: ${{ inputs.registry_url }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: ${{ inputs.pnpm_version }}
+
+      - name: Install dependencies
+        shell: bash
+        env:
+          INSTALL_COMMAND: ${{ inputs.install_command }}
+        run: bash -euo pipefail -c "$INSTALL_COMMAND"
+
+      - name: Build package
+        shell: bash
+        env:
+          BUILD_COMMAND: ${{ inputs.build_command }}
+        run: bash -euo pipefail -c "$BUILD_COMMAND"
+
+      - name: Publish package
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PUBLISH_COMMAND: ${{ inputs.publish_command }}
+        run: bash -euo pipefail -c "$PUBLISH_COMMAND"

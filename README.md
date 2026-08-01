@@ -51,6 +51,29 @@ checks that the tag matches `v*.*.*` by default, verifies that the tag points at
 deployment itself; caller workflows keep repo-specific release steps behind
 this preflight job.
 
+### NPM Publish
+
+Use `.github/workflows/npm-publish.yml` from Node package repositories whose
+package build and tests are already covered by `nix-ci.yml`:
+
+```yaml
+name: Publish npm package
+
+on:
+  push:
+    tags: [v*.*.*]
+
+jobs:
+  publish:
+    uses: monarchic-ai/.github/.github/workflows/npm-publish.yml@main
+    secrets: inherit
+```
+
+The reusable workflow runs the shared release preflight first, then installs
+dependencies, builds the package, and publishes to npm with `NPM_TOKEN`. It
+does not rerun repository tests; release tags should point at commits that
+already passed `Nix CI`.
+
 ### Maintenance
 
 Use `.github/workflows/maintenance.yml` from scheduled or manual caller
