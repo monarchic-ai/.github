@@ -77,7 +77,7 @@ already passed `Nix CI`.
 ### Maintenance
 
 Use `.github/workflows/maintenance.yml` from scheduled or manual caller
-workflows that should produce a report before any automation becomes mutating:
+workflows that should produce a report before optional generated-file updates:
 
 ```yaml
 name: Maintenance
@@ -100,7 +100,9 @@ The reusable workflow runs on `vars.CI_RUNNER_LABELS`, optionally evaluates
 `nix flake check --no-build`, optionally runs a repo-local maintenance command,
 writes a Markdown report to the job summary, and uploads it as an artifact. It
 does not push commits, open pull requests, deploy, publish, or mutate external
-systems by default.
+systems by default. Callers that need generated-file maintenance can pass
+`commit_paths`, `commit_message`, and `push_branch`; only those configured paths
+are staged and pushed.
 
 ### Docker CI
 

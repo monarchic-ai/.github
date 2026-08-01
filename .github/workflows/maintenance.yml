@@ -28,6 +28,21 @@ on:
         required: false
         type: string
         default: maintenance-report
+      commit_paths:
+        description: "Optional newline-separated paths to commit after maintenance."
+        required: false
+        type: string
+        default: ""
+      commit_message:
+        description: "Commit message for generated maintenance updates."
+        required: false
+        type: string
+        default: "chore: refresh maintenance outputs"
+      push_branch:
+        description: "Branch to push generated maintenance commits to."
+        required: false
+        type: string
+        default: ""
       timeout_minutes:
         description: "Maximum maintenance runtime in minutes."
         required: false
@@ -39,7 +54,7 @@ on:
         required: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   maintenance:
@@ -56,6 +71,9 @@ jobs:
       MONARCHIC_GITHUB_TOKEN: ${{ secrets.MONARCHIC_GITHUB_PAT || github.token }}
       REPORT_PATH: ${{ inputs.report_path }}
       MAINTENANCE_COMMAND: ${{ inputs.maintenance_command }}
+      COMMIT_PATHS: ${{ inputs.commit_paths }}
+      COMMIT_MESSAGE: ${{ inputs.commit_message }}
+      PUSH_BRANCH: ${{ inputs.push_branch }}
       NIX_CONFIG: |
         experimental-features = nix-command flakes
         access-tokens = github.com=${{ secrets.MONARCHIC_GITHUB_PAT || github.token }}
@@ -66,6 +84,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
@@ -136,7 +156,33 @@ jobs:
 
           cat "$REPORT_PATH" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Commit maintenance updates
+        if: ${{ inputs.commit_paths != '' && github.event_name != 'pull_request' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t commit_paths < <(printf '%s\n' "$COMMIT_PATHS" | sed '/^[[:space:]]*$/d')
+          if [ "${#commit_paths[@]}" -eq 0 ]; then
+            echo "No commit paths configured."
+            exit 0
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- "${commit_paths[@]}"
+
+          if git diff --cached --quiet; then
+            echo "No maintenance updates to commit."
+            exit 0
+          fi
+
+          git commit -m "$COMMIT_MESSAGE"
+          target_branch="${PUSH_BRANCH:-${GITHUB_REF_NAME}}"
+          git push origin "HEAD:${target_branch}"
+
       - name: Upload maintenance report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.report_artifact_name }}
