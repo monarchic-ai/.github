@@ -18,6 +18,11 @@ on:
         required: false
         type: string
         default: maintenance-report.md
+      artifact_path:
+        description: "Path or glob to upload as the maintenance artifact."
+        required: false
+        type: string
+        default: ""
       report_artifact_name:
         description: "Uploaded artifact name for the maintenance report."
         required: false
@@ -135,5 +140,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.report_artifact_name }}
-          path: ${{ inputs.report_path }}
+          path: ${{ inputs.artifact_path || inputs.report_path }}
           if-no-files-found: error
