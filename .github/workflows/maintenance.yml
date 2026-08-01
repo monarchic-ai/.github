@@ -53,6 +53,11 @@ on:
         required: false
         type: boolean
         default: false
+      require_pat_for_pull_request:
+        description: "Whether pull-request creation must fail without MONARCHIC_GITHUB_PAT instead of falling back to github.token."
+        required: false
+        type: boolean
+        default: false
       pull_request_base_branch:
         description: "Base branch for generated maintenance pull requests."
         required: false
@@ -100,6 +105,7 @@ jobs:
 
     env:
       MONARCHIC_GITHUB_TOKEN: ${{ secrets.MONARCHIC_GITHUB_PAT || github.token }}
+      MONARCHIC_GITHUB_PAT_PRESENT: ${{ secrets.MONARCHIC_GITHUB_PAT != '' }}
       REPORT_PATH: ${{ inputs.report_path }}
       MAINTENANCE_COMMAND: ${{ inputs.maintenance_command }}
       COMMIT_PATHS: ${{ inputs.commit_paths }}
@@ -187,6 +193,14 @@ jobs:
           fi
 
           cat "$REPORT_PATH" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Require PAT for maintenance pull requests
+        if: ${{ inputs.commit_paths != '' && inputs.create_pull_request && inputs.require_pat_for_pull_request && env.MONARCHIC_GITHUB_PAT_PRESENT != 'true' && github.event_name != 'pull_request' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "MONARCHIC_GITHUB_PAT is required to open generated maintenance pull requests." >&2
+          exit 1
 
       - name: Commit maintenance updates
         if: ${{ inputs.commit_paths != '' && ! inputs.create_pull_request && github.event_name != 'pull_request' }}
