@@ -13,6 +13,11 @@ on:
         required: false
         type: string
         default: ""
+      checkout_ref:
+        description: "Optional branch, tag, or SHA to check out before running maintenance."
+        required: false
+        type: string
+        default: ""
       report_path:
         description: "Path to write a maintenance report artifact."
         required: false
@@ -43,6 +48,31 @@ on:
         required: false
         type: string
         default: ""
+      create_pull_request:
+        description: "Whether generated maintenance updates should open or update a pull request."
+        required: false
+        type: boolean
+        default: false
+      pull_request_base_branch:
+        description: "Base branch for generated maintenance pull requests."
+        required: false
+        type: string
+        default: ""
+      pull_request_title:
+        description: "Title for generated maintenance pull requests."
+        required: false
+        type: string
+        default: "chore: refresh maintenance outputs"
+      pull_request_body:
+        description: "Body for generated maintenance pull requests."
+        required: false
+        type: string
+        default: "Automated maintenance refresh."
+      pull_request_labels:
+        description: "Optional newline-separated labels for generated maintenance pull requests."
+        required: false
+        type: string
+        default: ""
       timeout_minutes:
         description: "Maximum maintenance runtime in minutes."
         required: false
@@ -55,6 +85,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   maintenance:
@@ -86,6 +117,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ inputs.checkout_ref || github.ref }}
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
@@ -157,7 +189,7 @@ jobs:
           cat "$REPORT_PATH" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Commit maintenance updates
-        if: ${{ inputs.commit_paths != '' && github.event_name != 'pull_request' }}
+        if: ${{ inputs.commit_paths != '' && ! inputs.create_pull_request && github.event_name != 'pull_request' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -180,6 +212,19 @@ jobs:
           git commit -m "$COMMIT_MESSAGE"
           target_branch="${PUSH_BRANCH:-${GITHUB_REF_NAME}}"
           git push origin "HEAD:${target_branch}"
+
+      - name: Create or update maintenance pull request
+        if: ${{ inputs.commit_paths != '' && inputs.create_pull_request && github.event_name != 'pull_request' }}
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ env.MONARCHIC_GITHUB_TOKEN }}
+          branch: ${{ inputs.push_branch }}
+          base: ${{ inputs.pull_request_base_branch || inputs.checkout_ref || github.ref_name }}
+          title: ${{ inputs.pull_request_title }}
+          commit-message: ${{ inputs.commit_message }}
+          body: ${{ inputs.pull_request_body }}
+          labels: ${{ inputs.pull_request_labels }}
+          add-paths: ${{ inputs.commit_paths }}
 
       - name: Upload maintenance report
         if: always()

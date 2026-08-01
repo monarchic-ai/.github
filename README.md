@@ -102,7 +102,10 @@ writes a Markdown report to the job summary, and uploads it as an artifact. It
 does not push commits, open pull requests, deploy, publish, or mutate external
 systems by default. Callers that need generated-file maintenance can pass
 `commit_paths`, `commit_message`, and `push_branch`; only those configured paths
-are staged and pushed.
+are staged and pushed. To open or update a generated maintenance pull request
+instead of pushing directly to the current ref, also pass `create_pull_request`,
+`checkout_ref`, `pull_request_base_branch`, `pull_request_title`,
+`pull_request_body`, and optional `pull_request_labels`.
 
 ### Docker CI
 
