@@ -1,0 +1,89 @@
+name: Webapp Vercel Deploy
+
+on:
+  workflow_call:
+    inputs:
+      project:
+        description: "Vercel project to deploy."
+        required: true
+        type: string
+      run_smoke:
+        description: "Run live smoke after deployment."
+        required: false
+        type: boolean
+        default: true
+      deploy_app:
+        description: "Nix app that performs the Vercel deploy."
+        required: false
+        type: string
+        default: .#webapp-vercel-deploy
+      smoke_report_path:
+        description: "Live smoke report path emitted by the deploy app."
+        required: false
+        type: string
+        default: webapp-vercel-deploy-smoke-report.json
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy webapp to Vercel
+    if: github.ref == 'refs/heads/main'
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - monarchic-local
+      - nixos
+    timeout-minutes: 35
+    environment: ${{ inputs.project }}
+
+    env:
+      DEPLOY_APP: ${{ inputs.deploy_app }}
+      DEPLOY_PROJECT: ${{ inputs.project }}
+      RUN_SMOKE: ${{ inputs.run_smoke }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
+      VERCEL_GIT_COMMIT_REF: ${{ github.ref_name }}
+      VERCEL_GIT_REPO_OWNER: ${{ github.repository_owner }}
+      VERCEL_GIT_REPO_SLUG: ${{ github.event.repository.name }}
+      MONARCHIC_WEBAPP_EXPECTED_COMMIT_SHA: ${{ github.sha }}
+      NIX_CONFIG: |
+        experimental-features = nix-command flakes
+        accept-flake-config = true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Verify checked-out commit
+        run: test "$(git rev-parse HEAD)" = "$VERCEL_GIT_COMMIT_SHA"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ github.token }}
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Run Vercel deploy app
+        run: |
+          args=(--project "$DEPLOY_PROJECT")
+          if [ "$RUN_SMOKE" = "true" ]; then
+            args+=(--run-smoke)
+          else
+            args+=(--no-smoke)
+          fi
+          nix run "$DEPLOY_APP" -- "${args[@]}"
+
+      - name: Upload live smoke report
+        if: always() && inputs.run_smoke
+        uses: actions/upload-artifact@v4
+        with:
+          name: webapp-vercel-deploy-smoke-report-${{ inputs.project }}
+          path: ${{ inputs.smoke_report_path }}
+          if-no-files-found: ignore

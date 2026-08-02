@@ -163,6 +163,36 @@ the source and target AWS accounts, captures the source contract through
 `nix run .#aws-infra-contract`, and applies supported safe drift through
 `nix run .#aws-infra-safe-sync-apply`.
 
+### Webapp Vercel Deploy
+
+Use `.github/workflows/webapp-vercel-deploy.yml` from webapp repositories that
+expose the deploy sequence as a Nix app:
+
+```yaml
+name: Webapp Vercel deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        required: true
+        type: choice
+        options: [production, staging]
+
+jobs:
+  deploy:
+    uses: monarchic-ai/.github/.github/workflows/webapp-vercel-deploy.yml@main
+    with:
+      project: ${{ inputs.project }}
+    secrets: inherit
+```
+
+The reusable workflow is manual-only from caller repositories. It checks out
+the selected `main` commit, installs Nix, runs
+`nix run .#webapp-vercel-deploy`, and uploads the deploy smoke report when the
+caller asks for live smoke. Caller flakes own Vercel project IDs, readiness
+checks, build/deploy commands, and post-deploy smoke behavior.
+
 ### Docker CI
 
 Use `.github/workflows/docker-ci.yml` only for repositories where Docker is
