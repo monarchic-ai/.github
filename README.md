@@ -132,6 +132,37 @@ when strict non-dry staging gates are enabled, and runs `nix run
 .#webapp-release-smoke` for the aggregate release smoke. Caller workflows keep
 only dispatch inputs and delegate the implementation here.
 
+### AWS Infra Sync
+
+Use `.github/workflows/aws-infra-sync.yml` from repositories that expose
+environment readiness, contract capture, and safe-sync apply commands as Nix
+apps:
+
+```yaml
+name: AWS Infra Sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      sync_target:
+        required: true
+        type: choice
+        options: [production-from-staging, staging-from-dev]
+
+jobs:
+  aws-infra-sync:
+    uses: monarchic-ai/.github/.github/workflows/aws-infra-sync.yml@main
+    with:
+      sync_target: ${{ inputs.sync_target }}
+    secrets: inherit
+```
+
+The reusable workflow is manual-only from caller repositories. It runs on the
+shared self-hosted NixOS runner labels, performs GitHub OIDC role switching for
+the source and target AWS accounts, captures the source contract through
+`nix run .#aws-infra-contract`, and applies supported safe drift through
+`nix run .#aws-infra-safe-sync-apply`.
+
 ### Docker CI
 
 Use `.github/workflows/docker-ci.yml` only for repositories where Docker is

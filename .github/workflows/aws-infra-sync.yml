@@ -1,0 +1,160 @@
+name: AWS Infra Sync
+
+on:
+  workflow_call:
+    inputs:
+      sync_target:
+        description: "Environment sync to run."
+        required: true
+        type: string
+      production_confirmation:
+        description: "Required confirmation for production sync."
+        required: false
+        type: string
+        default: not-approved
+      dev_role_arn:
+        description: "AWS role ARN used to read dev infra state."
+        required: false
+        type: string
+        default: arn:aws:iam::622019393818:role/MonarchicDevDeployRole
+      staging_role_arn:
+        description: "AWS role ARN used to read or apply staging infra state."
+        required: false
+        type: string
+        default: arn:aws:iam::353468317999:role/MonarchicStagingDeployRole
+      production_role_arn:
+        description: "AWS role ARN used to apply production infra state."
+        required: false
+        type: string
+        default: arn:aws:iam::913433059611:role/MonarchicProductionDeployRole
+      aws_region:
+        description: "AWS region for Monarchic runtime infrastructure."
+        required: false
+        type: string
+        default: us-east-2
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  production-from-staging:
+    name: Production from staging
+    if: github.ref == 'refs/heads/main' && inputs.sync_target == 'production-from-staging' && inputs.production_confirmation == 'sync-production-from-staging'
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - monarchic-local
+      - nixos
+    timeout-minutes: 45
+    environment: production
+
+    env:
+      MONARCHIC_AWS_REGION: ${{ inputs.aws_region }}
+      NIX_CONFIG: |
+        experimental-features = nix-command flakes
+        accept-flake-config = true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ github.token }}
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Configure staging AWS credentials
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ inputs.staging_role_arn }}
+          aws-region: ${{ env.MONARCHIC_AWS_REGION }}
+
+      - name: Capture staging contract
+        env:
+          MONARCHIC_AWS_AUTH_MODE: ambient
+        run: |
+          nix run .#staging-cloud-promotion-readiness
+          nix run .#aws-infra-contract -- --env=staging > "$RUNNER_TEMP/staging-contract.json"
+
+      - name: Configure production AWS credentials
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ inputs.production_role_arn }}
+          aws-region: ${{ env.MONARCHIC_AWS_REGION }}
+
+      - name: Apply production safe sync
+        env:
+          MONARCHIC_AWS_AUTH_MODE: ambient
+          MONARCHIC_AWS_INFRA_SAFE_SYNC_ENFORCE_PRODUCTION_WINDOW: "false"
+        run: |
+          nix run .#production-cloud-promotion-readiness
+          nix run .#aws-infra-safe-sync-apply -- \
+            --source=staging \
+            --target=production \
+            --source-contract="$RUNNER_TEMP/staging-contract.json" \
+            --confirm=apply-aws-infra-safe-sync
+
+  staging-from-dev:
+    name: Staging from dev
+    if: github.ref == 'refs/heads/main' && inputs.sync_target == 'staging-from-dev'
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - monarchic-local
+      - nixos
+    timeout-minutes: 45
+
+    env:
+      MONARCHIC_AWS_REGION: ${{ inputs.aws_region }}
+      NIX_CONFIG: |
+        experimental-features = nix-command flakes
+        accept-flake-config = true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ github.token }}
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Configure dev AWS credentials
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ inputs.dev_role_arn }}
+          aws-region: ${{ env.MONARCHIC_AWS_REGION }}
+
+      - name: Capture dev contract
+        env:
+          MONARCHIC_AWS_AUTH_MODE: ambient
+        run: |
+          nix run .#dev-cloud-promotion-readiness
+          nix run .#aws-infra-contract -- --env=dev > "$RUNNER_TEMP/dev-contract.json"
+
+      - name: Configure staging AWS credentials
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ inputs.staging_role_arn }}
+          aws-region: ${{ env.MONARCHIC_AWS_REGION }}
+
+      - name: Apply staging safe sync
+        env:
+          MONARCHIC_AWS_AUTH_MODE: ambient
+        run: |
+          nix run .#staging-cloud-promotion-readiness
+          nix run .#aws-infra-safe-sync-apply -- \
+            --source=dev \
+            --target=staging \
+            --source-contract="$RUNNER_TEMP/dev-contract.json" \
+            --profile=dev-to-staging-policy \
+            --confirm=apply-aws-infra-safe-sync
