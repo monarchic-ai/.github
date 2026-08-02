@@ -25,12 +25,13 @@ jobs:
     secrets: inherit
 ```
 
-The reusable workflow runs on `vars.CI_RUNNER_LABELS`, builds every
-`packages.${system}` output, builds every `checks.${system}` output, runs
-`nix flake check`, and optionally signs and uploads built store paths to the
-Monarchic Nix binary cache. It is intended to run for trusted pushes to `main`,
-including merges, and for manual dispatches. If the caller repository has a
-`MONARCHIC_GITHUB_PAT` secret, the workflow uses it for private flake inputs.
+The reusable workflow runs on the shared self-hosted NixOS runner labels,
+builds every `packages.${system}` output, builds every `checks.${system}`
+output, runs `nix flake check`, and optionally signs and uploads built store
+paths to the Monarchic Nix binary cache. It is intended to run for trusted
+pushes to `main`, including merges, and for manual dispatches. If the caller
+repository has a `MONARCHIC_GITHUB_PAT` secret, the workflow uses it for private
+flake inputs.
 
 ### Release
 
@@ -44,12 +45,12 @@ jobs:
     secrets: inherit
 ```
 
-The reusable workflow runs on `vars.CI_RUNNER_LABELS`, requires a tag ref,
-checks that the tag matches `v*.*.*` by default, verifies that the tag points at
-`origin/main`, and verifies that the caller repository already has a successful
-`Nix CI` workflow run for the tagged commit. It performs no publishing or
-deployment itself; caller workflows keep repo-specific release steps behind
-this preflight job.
+The reusable workflow runs on the shared self-hosted NixOS runner labels,
+requires a tag ref, checks that the tag matches `v*.*.*` by default, verifies
+that the tag points at `origin/main`, and verifies that the caller repository
+already has a successful `Nix CI` workflow run for the tagged commit. It
+performs no publishing or deployment itself; caller workflows keep repo-specific
+release steps behind this preflight job.
 
 ### NPM Publish
 
@@ -96,16 +97,40 @@ jobs:
     secrets: inherit
 ```
 
-The reusable workflow runs on `vars.CI_RUNNER_LABELS`, optionally evaluates
-`nix flake check --no-build`, optionally runs a repo-local maintenance command,
-writes a Markdown report to the job summary, and uploads it as an artifact. It
-does not push commits, open pull requests, deploy, publish, or mutate external
-systems by default. Callers that need generated-file maintenance can pass
-`commit_paths`, `commit_message`, and `push_branch`; only those configured paths
-are staged and pushed. To open or update a generated maintenance pull request
-instead of pushing directly to the current ref, also pass `create_pull_request`,
-`checkout_ref`, `pull_request_base_branch`, `pull_request_title`,
-`pull_request_body`, and optional `pull_request_labels`.
+The reusable workflow runs on the shared self-hosted NixOS runner labels,
+optionally evaluates `nix flake check --no-build`, optionally runs a repo-local
+maintenance command, writes a Markdown report to the job summary, and uploads it
+as an artifact. It does not push commits, open pull requests, deploy, publish,
+or mutate external systems by default. Callers that need generated-file
+maintenance can pass `commit_paths`, `commit_message`, and `push_branch`; only
+those configured paths are staged and pushed. To open or update a generated
+maintenance pull request instead of pushing directly to the current ref, also
+pass `create_pull_request`, `checkout_ref`, `pull_request_base_branch`,
+`pull_request_title`, `pull_request_body`, and optional `pull_request_labels`.
+
+### Webapp Release Smoke
+
+Use `.github/workflows/webapp-release-smoke.yml` from webapp repositories that
+expose release-smoke commands through Nix apps:
+
+```yaml
+name: Webapp release smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release-smoke:
+    uses: monarchic-ai/.github/.github/workflows/webapp-release-smoke.yml@main
+    secrets: inherit
+```
+
+The reusable workflow is manual-only from caller repositories. It runs on the
+shared self-hosted NixOS runner labels, installs dependencies with the caller
+flake dev shell, runs staging infra readiness through caller-provided Nix apps
+when strict non-dry staging gates are enabled, and runs `nix run
+.#webapp-release-smoke` for the aggregate release smoke. Caller workflows keep
+only dispatch inputs and delegate the implementation here.
 
 ### Docker CI
 

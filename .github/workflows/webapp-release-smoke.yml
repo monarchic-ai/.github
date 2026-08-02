@@ -1,0 +1,219 @@
+name: Webapp Release Smoke
+
+on:
+  workflow_call:
+    inputs:
+      dry_run:
+        description: "Print the release-smoke plan without touching live systems."
+        required: false
+        type: boolean
+        default: true
+      strict:
+        description: "Fail when required gates fail or are skipped."
+        required: false
+        type: boolean
+        default: true
+      include_staging:
+        description: "Run the staging webapp smoke gate."
+        required: false
+        type: boolean
+        default: true
+      allow_checkout_write:
+        description: "Allow checkout smoke to create a real checkout session."
+        required: false
+        type: boolean
+        default: false
+      checkout_plan_slug:
+        description: "Catalog plan slug for checkout smoke."
+        required: false
+        type: string
+        default: "usage-developer"
+      checkout_cadence:
+        description: "Billing cadence for checkout smoke."
+        required: false
+        type: string
+        default: monthly
+      webapp_url:
+        description: "Production webapp smoke target."
+        required: false
+        type: string
+        default: "https://app.monarchic.io"
+      webapp_staging_url:
+        description: "Staging webapp smoke target."
+        required: false
+        type: string
+        default: "https://staging-app.monarchic.io"
+    secrets:
+      MONARCHIC_WAITLIST_SMOKE_EMAIL:
+        required: false
+      MONARCHIC_WAITLIST_SMOKE_API_URL:
+        required: false
+      MONARCHIC_WEBAPP_SMOKE_TOKEN:
+        required: false
+      MONARCHIC_WEBAPP_SMOKE_ID_TOKEN:
+        required: false
+      MONARCHIC_WEBAPP_SMOKE_EXPECTED_EMAIL:
+        required: false
+      MONARCHIC_WEBAPP_PRODUCTION_SMOKE_TOKEN:
+        required: false
+      MONARCHIC_WEBAPP_PRODUCTION_SMOKE_ID_TOKEN:
+        required: false
+      MONARCHIC_WEBAPP_PRODUCTION_SMOKE_EXPECTED_EMAIL:
+        required: false
+      MONARCHIC_WEBAPP_STAGING_SMOKE_TOKEN:
+        required: false
+      MONARCHIC_WEBAPP_STAGING_SMOKE_ID_TOKEN:
+        required: false
+      MONARCHIC_WEBAPP_STAGING_SMOKE_EXPECTED_EMAIL:
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  release-smoke:
+    name: External webapp gates
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - monarchic-local
+      - nixos
+    timeout-minutes: 40
+
+    env:
+      MONARCHIC_RELEASE_GATE_DRY_RUN: ${{ inputs.dry_run }}
+      MONARCHIC_RELEASE_GATE_STRICT: ${{ inputs.strict }}
+      MONARCHIC_RELEASE_GATE_INCLUDE_STAGING: ${{ inputs.include_staging }}
+      MONARCHIC_RELEASE_GATE_INCLUDE_WEBSITE: "false"
+      MONARCHIC_RELEASE_GATE_REPORT: webapp-release-smoke-report.json
+      MONARCHIC_WEBAPP_SMOKE_REPORT: webapp-production-smoke-report.json
+      MONARCHIC_WEBAPP_EXPECTED_COMMIT_SHA: ${{ github.sha }}
+      MONARCHIC_WAITLIST_SMOKE_REPORT: webapp-waitlist-smoke-report.json
+      MONARCHIC_CHECKOUT_SMOKE_REPORT: webapp-checkout-smoke-report.json
+      MONARCHIC_WEBAPP_SMOKE_URL: ${{ inputs.webapp_url }}
+      MONARCHIC_WEBAPP_STAGING_SMOKE_URL: ${{ inputs.webapp_staging_url }}
+      MONARCHIC_WAITLIST_SMOKE_EMAIL: ${{ secrets.MONARCHIC_WAITLIST_SMOKE_EMAIL }}
+      MONARCHIC_WAITLIST_SMOKE_API_URL: ${{ secrets.MONARCHIC_WAITLIST_SMOKE_API_URL }}
+      MONARCHIC_WAITLIST_SMOKE_SLUG: ${{ vars.MONARCHIC_WAITLIST_SMOKE_SLUG }}
+      MONARCHIC_WAITLIST_SMOKE_ALLOWED_SLUGS: ${{ vars.MONARCHIC_WAITLIST_SMOKE_ALLOWED_SLUGS }}
+      MONARCHIC_WAITLIST_SMOKE_ENVIRONMENT: ${{ vars.MONARCHIC_WAITLIST_SMOKE_ENVIRONMENT }}
+      MONARCHIC_WAITLIST_SMOKE_ALLOW_NON_PLUS_EMAIL: ${{ vars.MONARCHIC_WAITLIST_SMOKE_ALLOW_NON_PLUS_EMAIL }}
+      MONARCHIC_WAITLIST_SMOKE_ALLOW_CUSTOM_EMAIL: ${{ vars.MONARCHIC_WAITLIST_SMOKE_ALLOW_CUSTOM_EMAIL }}
+      MONARCHIC_WAITLIST_SMOKE_GENERATE_EMAIL: ${{ vars.MONARCHIC_WAITLIST_SMOKE_GENERATE_EMAIL }}
+      MONARCHIC_WEBAPP_SMOKE_TOKEN: ${{ secrets.MONARCHIC_WEBAPP_SMOKE_TOKEN }}
+      MONARCHIC_WEBAPP_SMOKE_ID_TOKEN: ${{ secrets.MONARCHIC_WEBAPP_SMOKE_ID_TOKEN }}
+      MONARCHIC_WEBAPP_SMOKE_EXPECTED_EMAIL: ${{ secrets.MONARCHIC_WEBAPP_SMOKE_EXPECTED_EMAIL }}
+      MONARCHIC_WEBAPP_SMOKE_EXPECTED_ISSUER: ${{ vars.MONARCHIC_WEBAPP_SMOKE_EXPECTED_ISSUER }}
+      MONARCHIC_WEBAPP_SMOKE_EXPECTED_AUDIENCE: ${{ vars.MONARCHIC_WEBAPP_SMOKE_EXPECTED_AUDIENCE }}
+      MONARCHIC_WEBAPP_PRODUCTION_SMOKE_TOKEN: ${{ secrets.MONARCHIC_WEBAPP_PRODUCTION_SMOKE_TOKEN }}
+      MONARCHIC_WEBAPP_PRODUCTION_SMOKE_ID_TOKEN: ${{ secrets.MONARCHIC_WEBAPP_PRODUCTION_SMOKE_ID_TOKEN }}
+      MONARCHIC_WEBAPP_PRODUCTION_SMOKE_EXPECTED_EMAIL: ${{ secrets.MONARCHIC_WEBAPP_PRODUCTION_SMOKE_EXPECTED_EMAIL }}
+      MONARCHIC_WEBAPP_PRODUCTION_SMOKE_EXPECTED_ISSUER: ${{ vars.MONARCHIC_WEBAPP_PRODUCTION_SMOKE_EXPECTED_ISSUER }}
+      MONARCHIC_WEBAPP_PRODUCTION_SMOKE_EXPECTED_AUDIENCE: ${{ vars.MONARCHIC_WEBAPP_PRODUCTION_SMOKE_EXPECTED_AUDIENCE }}
+      MONARCHIC_WEBAPP_STAGING_SMOKE_TOKEN: ${{ secrets.MONARCHIC_WEBAPP_STAGING_SMOKE_TOKEN }}
+      MONARCHIC_WEBAPP_STAGING_SMOKE_ID_TOKEN: ${{ secrets.MONARCHIC_WEBAPP_STAGING_SMOKE_ID_TOKEN }}
+      MONARCHIC_WEBAPP_STAGING_SMOKE_EXPECTED_EMAIL: ${{ secrets.MONARCHIC_WEBAPP_STAGING_SMOKE_EXPECTED_EMAIL }}
+      MONARCHIC_WEBAPP_STAGING_SMOKE_EXPECTED_ISSUER: ${{ vars.MONARCHIC_WEBAPP_STAGING_SMOKE_EXPECTED_ISSUER }}
+      MONARCHIC_WEBAPP_STAGING_SMOKE_EXPECTED_AUDIENCE: ${{ vars.MONARCHIC_WEBAPP_STAGING_SMOKE_EXPECTED_AUDIENCE }}
+      MONARCHIC_WEBAPP_CHECKOUT_SMOKE_URL: ${{ inputs.webapp_staging_url }}
+      MONARCHIC_CHECKOUT_SMOKE_EXPECTED_API_URL: ${{ vars.MONARCHIC_CHECKOUT_SMOKE_EXPECTED_API_URL }}
+      MONARCHIC_CHECKOUT_SMOKE_ALLOW_WRITE: ${{ inputs.allow_checkout_write }}
+      MONARCHIC_CHECKOUT_SMOKE_ALLOW_PRODUCTION: ${{ vars.MONARCHIC_CHECKOUT_SMOKE_ALLOW_PRODUCTION }}
+      MONARCHIC_CHECKOUT_SMOKE_PLAN_SLUG: ${{ inputs.checkout_plan_slug }}
+      MONARCHIC_CHECKOUT_SMOKE_CADENCE: ${{ inputs.checkout_cadence }}
+      MONARCHIC_AWS_REGION: us-east-2
+      NIX_CONFIG: |
+        experimental-features = nix-command flakes
+        accept-flake-config = true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ github.token }}
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Install dependencies
+        run: nix develop --command pnpm install --frozen-lockfile
+
+      - name: Configure staging AWS credentials
+        if: inputs.include_staging && !inputs.dry_run
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.MONARCHIC_STAGING_AWS_ROLE_ARN }}
+          aws-region: ${{ env.MONARCHIC_AWS_REGION }}
+
+      - name: Run staging hosted MCP Lambda readiness
+        if: inputs.include_staging && !inputs.dry_run
+        env:
+          MONARCHIC_AWS_AUTH_MODE: ambient
+        run: |
+          mkdir -p .release/infra-readiness
+          nix run .#staging-hosted-mcp-lambda-readiness -- --env=staging --json \
+            > .release/infra-readiness/staging-hosted-mcp-lambda-readiness.json
+          cat .release/infra-readiness/staging-hosted-mcp-lambda-readiness.json
+
+      - name: Capture staging Auth0 config secret
+        if: inputs.include_staging && !inputs.dry_run
+        run: |
+          mkdir -p .release/infra-readiness/secrets
+          aws secretsmanager get-secret-value \
+            --region "$MONARCHIC_AWS_REGION" \
+            --secret-id monarchic-staging/auth0-config \
+            --query SecretString \
+            --output text > .release/infra-readiness/secrets/staging-auth0-config.json
+
+      - name: Configure management AWS credentials
+        if: inputs.include_staging && !inputs.dry_run
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.MONARCHIC_MANAGEMENT_AWS_ROLE_ARN }}
+          aws-region: ${{ env.MONARCHIC_AWS_REGION }}
+
+      - name: Capture staging Auth0 management secret
+        if: inputs.include_staging && !inputs.dry_run
+        run: |
+          aws secretsmanager get-secret-value \
+            --region "$MONARCHIC_AWS_REGION" \
+            --secret-id monarchic/staging/auth0-management-api \
+            --query SecretString \
+            --output text > .release/infra-readiness/secrets/staging-auth0-management.json
+
+      - name: Run staging Auth0 E2E readiness
+        if: inputs.include_staging && !inputs.dry_run
+        env:
+          MONARCHIC_AUTH0_CONFIG_SECRET_FILE: .release/infra-readiness/secrets/staging-auth0-config.json
+          MONARCHIC_AUTH0_CLIENT_CREDENTIALS_SECRET_FILE: .release/infra-readiness/secrets/staging-auth0-management.json
+        run: |
+          nix run .#staging-auth0-e2e-readiness -- --env=staging --json \
+            > .release/infra-readiness/staging-auth0-e2e-readiness.json
+          cat .release/infra-readiness/staging-auth0-e2e-readiness.json
+
+      - name: Remove infra readiness secret files
+        if: always()
+        run: rm -rf .release/infra-readiness/secrets
+
+      - name: Run release smoke
+        run: nix run .#webapp-release-smoke
+
+      - name: Upload release smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webapp-release-smoke-report
+          path: |
+            webapp-release-smoke-report.json
+            webapp-production-smoke-report.json
+            webapp-staging-smoke-report.json
+            webapp-authenticated-smoke-report.json
+            webapp-waitlist-smoke-report.json
+            webapp-checkout-smoke-report.json
+            .release/infra-readiness/*.json
+          if-no-files-found: ignore
